@@ -1,3 +1,7 @@
+# Created by https://www.toptal.com/developers/gitignore/api/dart
+# Edit at https://www.toptal.com/developers/gitignore?templates=dart
+
+### Dart ###
 # See https://www.dartlang.org/guides/libraries/private-files
 
 # Files and directories created by pub
@@ -25,3 +29,9 @@ doc/api/
 
 .flutter-plugins
 .flutter-plugins-dependencies
+
+### Dart Patch ###
+# dotenv environment variables file
+.env
+
+# End of https://www.toptal.com/developers/gitignore/api/dart
