@@ -4,10 +4,11 @@ import 'package:pickpic_project_client/page/voice_search_page.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
+import 'dart:async';
 
 import 'voice_search_page_test.mocks.dart';
 
-@GenerateMocks([stt.SpeechToText])
+@GenerateMocks([stt.SpeechToText, stt.SpeechRecognitionResult])
 void main() {
   late MockSpeechToText mockSpeechToText;
 
@@ -18,7 +19,7 @@ void main() {
   Widget createWidgetUnderTest() {
     return MaterialApp(
       home: Scaffold(
-        body: VoiceSearchPageWithMock(speechToText: mockSpeechToText),
+        body: VoiceSearchPage(injectedSpeech: mockSpeechToText),
       ),
     );
   }
@@ -29,78 +30,30 @@ void main() {
     expect(find.text(''), findsOneWidget);
   });
 
-  testWidgets('tapping mic triggers speech recognition', (WidgetTester tester) async {
+  testWidgets('tapping mic triggers speech recognition and stops after silence', (WidgetTester tester) async {
     when(mockSpeechToText.initialize()).thenAnswer((_) async => true);
-    when(mockSpeechToText.isAvailable).thenReturn(true);
-    when(mockSpeechToText.listen(onResult: anyNamed('onResult'))).thenAnswer((_) async => {});
+
+    final mockResult = MockSpeechRecognitionResult();
+    when(mockResult.recognizedWords).thenReturn('테스트 음성');
+    when(mockResult.finalResult).thenReturn(true);
+
+    when(mockSpeechToText.listen(onResult: anyNamed('onResult'))).thenAnswer((invocation) {
+      final callback = invocation.namedArguments[#onResult] as void Function(stt.SpeechRecognitionResult);
+      Future.delayed(Duration(milliseconds: 500), () {
+        callback(mockResult);
+      });
+      return Future.value();
+    });
+
+    when(mockSpeechToText.stop()).thenAnswer((_) async => {});
 
     await tester.pumpWidget(createWidgetUnderTest());
     await tester.tap(find.byType(ElevatedButton));
     await tester.pump();
 
-    verify(mockSpeechToText.initialize()).called(1);
-    verify(mockSpeechToText.listen(onResult: anyNamed('onResult'))).called(1);
+    await tester.pump(Duration(seconds: 3));
+
+    verify(mockSpeechToText.stop()).called(1);
+    expect(find.text('테스트 음성'), findsOneWidget);
   });
-}
-
-class VoiceSearchPageWithMock extends StatefulWidget {
-  final stt.SpeechToText speechToText;
-
-  const VoiceSearchPageWithMock({Key? key, required this.speechToText}) : super(key: key);
-
-  @override
-  _VoiceSearchPageWithMockState createState() => _VoiceSearchPageWithMockState();
-}
-
-class _VoiceSearchPageWithMockState extends State<VoiceSearchPageWithMock> {
-  late stt.SpeechToText _speech;
-  bool _isListening = false;
-  String _text = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _speech = widget.speechToText;
-  }
-
-  void _listen() async {
-    if (!_isListening) {
-      bool available = await _speech.initialize();
-      if (available) {
-        setState(() => _isListening = true);
-        _speech.listen(
-          onResult: (result) => setState(() {
-            _text = result.recognizedWords;
-          }),
-        );
-      }
-    } else {
-      setState(() => _isListening = false);
-      _speech.stop();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          ElevatedButton(
-            onPressed: _listen,
-            style: ElevatedButton.styleFrom(
-              shape: CircleBorder(),
-              padding: EdgeInsets.all(40),
-            ),
-            child: Icon(
-              _isListening ? Icons.mic : Icons.mic_none,
-              size: 40,
-            ),
-          ),
-          SizedBox(height: 20),
-          Text(_text, style: TextStyle(fontSize: 18)),
-        ],
-      ),
-    );
-  }
 }
