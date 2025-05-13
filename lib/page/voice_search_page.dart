@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:pickpic_project_client/components/GalleryImageGrid.dart';
 
 class VoiceSearchPage extends StatefulWidget {
   final stt.SpeechToText? injectedSpeech;
@@ -114,17 +115,18 @@ class _VoiceSearchPageState extends State<VoiceSearchPage> {
         Text(_text, style: TextStyle(fontSize: 18)),
         const SizedBox(height: 20),
         Expanded(
-          child: GridView.builder(
-            controller: _scrollController,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
-            itemCount: images.length + (isLoading ? 1 : 0),
-            itemBuilder: (context, index) {
-              if (index >= images.length) {
-                return Center(child: CircularProgressIndicator());
-              }
-              return Card(child: Center(child: Text(images[index])));
-            },
-          ),
+          // child: GridView.builder(
+          //   controller: _scrollController,
+          //   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
+          //   itemCount: images.length + (isLoading ? 1 : 0),
+          //   itemBuilder: (context, index) {
+          //     if (index >= images.length) {
+          //       return Center(child: CircularProgressIndicator());
+          //     }
+          //     return Card(child: Center(child: Text(images[index])));
+          //   },
+          // ),
+          child: GalleryImageGrid(),
         ),
       ],
     );

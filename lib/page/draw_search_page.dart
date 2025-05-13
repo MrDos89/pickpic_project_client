@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pickpic_project_client/components/GalleryImageGrid.dart';
 
 class DrawSearchPage extends StatefulWidget {
   @override
@@ -80,17 +81,18 @@ class _DrawSearchPageState extends State<DrawSearchPage> {
         ElevatedButton(onPressed: () {}, child: Text("검색")),
         const SizedBox(height: 20),
         Expanded(
-          child: GridView.builder(
-            controller: _scrollController,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
-            itemCount: images.length + (isLoading ? 1 : 0),
-            itemBuilder: (context, index) {
-              if (index >= images.length) {
-                return Center(child: CircularProgressIndicator());
-              }
-              return Card(child: Center(child: Text(images[index])));
-            },
-          ),
+          // child: GridView.builder(
+          //   controller: _scrollController,
+          //   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
+          //   itemCount: images.length + (isLoading ? 1 : 0),
+          //   itemBuilder: (context, index) {
+          //     if (index >= images.length) {
+          //       return Center(child: CircularProgressIndicator());
+          //     }
+          //     return Card(child: Center(child: Text(images[index])));
+          //   },
+          // ),
+          child: GalleryImageGrid(),
         ),
       ],
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pickpic_project_client/components/GalleryImageGrid.dart';
 
 class TextSearchPage extends StatefulWidget {
   @override
@@ -56,21 +57,22 @@ class _TextSearchPageState extends State<TextSearchPage> {
           ),
         ),
         Expanded(
-          child: GridView.builder(
-            controller: _scrollController,
-            padding: EdgeInsets.all(8),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemBuilder: (context, index) => Container(
-              color: Colors.grey[300],
-              alignment: Alignment.center,
-              child: Text(_photos[index]),
-            ),
-            itemCount: _photos.length,
-          ),
+          // child: GridView.builder(
+          //   controller: _scrollController,
+          //   padding: EdgeInsets.all(8),
+          //   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          //     crossAxisCount: 3,
+          //     crossAxisSpacing: 8,
+          //     mainAxisSpacing: 8,
+          //   ),
+          //   itemBuilder: (context, index) => Container(
+          //     color: Colors.grey[300],
+          //     alignment: Alignment.center,
+          //     child: Text(_photos[index]),
+          //   ),
+          //   itemCount: _photos.length,
+          // ),
+          child: GalleryImageGrid(),
         ),
         if (_isLoading) Padding(
           padding: const EdgeInsets.all(16.0),

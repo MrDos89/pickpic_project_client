@@ -2,6 +2,7 @@
     package="com.pickpic.pickpic_project_client">
 
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <application
         android:label="pickpic_project_client"
