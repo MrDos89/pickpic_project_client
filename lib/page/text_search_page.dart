@@ -1,6 +1,42 @@
 import 'package:flutter/material.dart';
 
-class TextSearchPage extends StatelessWidget {
+class TextSearchPage extends StatefulWidget {
+  @override
+  _TextSearchPageState createState() => _TextSearchPageState();
+}
+
+class _TextSearchPageState extends State<TextSearchPage> {
+  final ScrollController _scrollController = ScrollController();
+  List<String> _photos = List.generate(20, (index) => '사진 $index');
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200 && !_isLoading) {
+      _loadMore();
+    }
+  }
+
+  void _loadMore() async {
+    setState(() => _isLoading = true);
+    await Future.delayed(Duration(seconds: 1));
+    setState(() {
+      _photos.addAll(List.generate(20, (index) => '사진 ${_photos.length + index}'));
+      _isLoading = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -21,6 +57,7 @@ class TextSearchPage extends StatelessWidget {
         ),
         Expanded(
           child: GridView.builder(
+            controller: _scrollController,
             padding: EdgeInsets.all(8),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
@@ -29,10 +66,15 @@ class TextSearchPage extends StatelessWidget {
             ),
             itemBuilder: (context, index) => Container(
               color: Colors.grey[300],
-              child: Icon(Icons.photo),
+              alignment: Alignment.center,
+              child: Text(_photos[index]),
             ),
-            itemCount: 9,
+            itemCount: _photos.length,
           ),
+        ),
+        if (_isLoading) Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: CircularProgressIndicator(),
         )
       ],
     );

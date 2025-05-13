@@ -8,6 +8,31 @@ class DrawSearchPage extends StatefulWidget {
 class _DrawSearchPageState extends State<DrawSearchPage> {
   Image? drawnImage;
 
+  final ScrollController _scrollController = ScrollController();
+  List<String> images = List.generate(20, (index) => '사진 $index');
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100 && !isLoading) {
+      _loadMore();
+    }
+  }
+
+  void _loadMore() async {
+    setState(() => isLoading = true);
+    await Future.delayed(Duration(seconds: 1));
+    setState(() {
+      images.addAll(List.generate(20, (index) => '사진 ${images.length + index}'));
+      isLoading = false;
+    });
+  }
+
   void _openDrawingModal() async {
     await showDialog(
       context: context,
@@ -41,8 +66,8 @@ class _DrawSearchPageState extends State<DrawSearchPage> {
   @override
   Widget build(BuildContext context) {
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        const SizedBox(height: 30),
         Center(
           child: drawnImage != null
               ? drawnImage!
@@ -51,9 +76,29 @@ class _DrawSearchPageState extends State<DrawSearchPage> {
             onPressed: _openDrawingModal,
           ),
         ),
-        SizedBox(height: 20),
-        ElevatedButton(onPressed: () {}, child: Text("검색"))
+        const SizedBox(height: 10),
+        ElevatedButton(onPressed: () {}, child: Text("검색")),
+        const SizedBox(height: 20),
+        Expanded(
+          child: GridView.builder(
+            controller: _scrollController,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
+            itemCount: images.length + (isLoading ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (index >= images.length) {
+                return Center(child: CircularProgressIndicator());
+              }
+              return Card(child: Center(child: Text(images[index])));
+            },
+          ),
+        ),
       ],
     );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 }

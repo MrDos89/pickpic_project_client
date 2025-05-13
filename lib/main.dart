@@ -3,6 +3,7 @@ import 'page/text_search_page.dart';
 import 'page/image_search_page.dart';
 import 'page/voice_search_page.dart';
 import 'page/draw_search_page.dart';
+import 'page/pose_search_page.dart';
 import 'page/settings_page.dart';
 
 void main() => runApp(MyApp());
@@ -64,6 +65,7 @@ class _HomePageState extends State<HomePage> {
       ImageSearchPage(),
       VoiceSearchPage(),
       DrawSearchPage(),
+      PoseSearchPage(),
       Container(),
     ];
   }
@@ -100,6 +102,10 @@ class _HomePageState extends State<HomePage> {
                 label: Text('그리기로 검색'),
               ),
               NavigationRailDestination(
+                icon: Icon(Icons.accessibility_new),
+                label: Text('특정 포즈로 검색'),
+              ),
+              NavigationRailDestination(
                 icon: Icon(Icons.settings),
                 label: Text('설정'),
               ),
@@ -107,7 +113,7 @@ class _HomePageState extends State<HomePage> {
           ),
           const VerticalDivider(thickness: 1, width: 1),
           Expanded(
-            child: selectedIndex == 4
+            child: selectedIndex == 5
                 ? SettingsPage(
               toggleTheme: (mode) {
                 widget.toggleTheme(mode);

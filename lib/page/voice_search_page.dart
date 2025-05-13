@@ -19,16 +19,22 @@ class _VoiceSearchPageState extends State<VoiceSearchPage> {
   final Duration _silenceThreshold = Duration(seconds: 2);
   late final Ticker _ticker;
 
+  final ScrollController _scrollController = ScrollController();
+  List<String> images = List.generate(20, (index) => '사진 $index');
+  bool isLoading = false;
+
   @override
   void initState() {
     super.initState();
     _speech = widget.injectedSpeech ?? stt.SpeechToText();
     _ticker = Ticker(_checkSilence)..start();
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     _ticker.dispose();
+    _scrollController.dispose();
     _speech.stop();
     super.dispose();
   }
@@ -66,18 +72,33 @@ class _VoiceSearchPageState extends State<VoiceSearchPage> {
     if (_isListening) {
       setState(() => _isListening = false);
       _speech.stop();
-      debugPrint('검색 실행: \$_text');
-      // TODO: 여기에 실제 검색 함수 연동 가능
+      debugPrint('검색 실행: $_text');
+      // TODO: 검색 로직과 연동 가능
     }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100 && !isLoading) {
+      _loadMore();
+    }
+  }
+
+  void _loadMore() async {
+    setState(() => isLoading = true);
+    await Future.delayed(Duration(seconds: 1));
+    setState(() {
+      images.addAll(List.generate(20, (index) => '사진 ${images.length + index}'));
+      isLoading = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          ElevatedButton(
+    return Column(
+      children: [
+        const SizedBox(height: 30),
+        Center(
+          child: ElevatedButton(
             onPressed: _listen,
             style: ElevatedButton.styleFrom(
               shape: CircleBorder(),
@@ -88,10 +109,24 @@ class _VoiceSearchPageState extends State<VoiceSearchPage> {
               size: 40,
             ),
           ),
-          SizedBox(height: 20),
-          Text(_text, style: TextStyle(fontSize: 18)),
-        ],
-      ),
+        ),
+        const SizedBox(height: 20),
+        Text(_text, style: TextStyle(fontSize: 18)),
+        const SizedBox(height: 20),
+        Expanded(
+          child: GridView.builder(
+            controller: _scrollController,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
+            itemCount: images.length + (isLoading ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (index >= images.length) {
+                return Center(child: CircularProgressIndicator());
+              }
+              return Card(child: Center(child: Text(images[index])));
+            },
+          ),
+        ),
+      ],
     );
   }
 }
