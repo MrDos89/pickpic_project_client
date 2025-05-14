@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:pickpic_project_client/components/gallery_image_grid.dart';
 
 class PoseSearchPage extends StatefulWidget {
-  const PoseSearchPage({Key? key}) : super(key: key);
+  final int crossAxisCount;
+
+  const PoseSearchPage({Key? key, this.crossAxisCount = 3}) : super(key: key);
 
   @override
   State<PoseSearchPage> createState() => _PoseSearchPageState();
@@ -121,7 +123,7 @@ class _PoseSearchPageState extends State<PoseSearchPage> {
           //   ),
           //   itemCount: _photos.length,
           // ),
-          child: GalleryImageGrid(),
+          child: GalleryImageGrid(crossAxisCount: widget.crossAxisCount),
         ),
         if (_isLoading) Padding(
           padding: const EdgeInsets.all(16.0),

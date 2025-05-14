@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:pickpic_project_client/components/gallery_image_grid.dart';
 
 class DrawSearchPage extends StatefulWidget {
+  final int crossAxisCount;
+
+  const DrawSearchPage({Key? key, this.crossAxisCount = 3}) : super(key: key); // 기본값 3
+
   @override
   _DrawSearchPageState createState() => _DrawSearchPageState();
 }
@@ -92,7 +96,7 @@ class _DrawSearchPageState extends State<DrawSearchPage> {
           //     return Card(child: Center(child: Text(images[index])));
           //   },
           // ),
-          child: GalleryImageGrid(),
+          child: GalleryImageGrid(crossAxisCount: widget.crossAxisCount),
         ),
       ],
     );

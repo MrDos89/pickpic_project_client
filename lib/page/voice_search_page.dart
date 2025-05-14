@@ -5,8 +5,9 @@ import 'package:pickpic_project_client/components/gallery_image_grid.dart';
 
 class VoiceSearchPage extends StatefulWidget {
   final stt.SpeechToText? injectedSpeech;
+  final int crossAxisCount;
 
-  const VoiceSearchPage({Key? key, this.injectedSpeech}) : super(key: key);
+  const VoiceSearchPage({Key? key, this.injectedSpeech, this.crossAxisCount = 3}) : super(key: key);
 
   @override
   _VoiceSearchPageState createState() => _VoiceSearchPageState();
@@ -126,7 +127,7 @@ class _VoiceSearchPageState extends State<VoiceSearchPage> {
           //     return Card(child: Center(child: Text(images[index])));
           //   },
           // ),
-          child: GalleryImageGrid(),
+          child: GalleryImageGrid(crossAxisCount: widget.crossAxisCount),
         ),
       ],
     );

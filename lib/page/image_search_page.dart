@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:pickpic_project_client/components/gallery_image_grid.dart';
 
 class ImageSearchPage extends StatefulWidget {
+  final int crossAxisCount;
+
+  const ImageSearchPage({Key? key, this.crossAxisCount = 3}) : super(key: key);
+
   @override
   _ImageSearchPageState createState() => _ImageSearchPageState();
 }
@@ -63,7 +67,7 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
           //     return Card(child: Center(child: Text(images[index])));
           //   },
           // ),
-          child: GalleryImageGrid(),
+          child: GalleryImageGrid(crossAxisCount: widget.crossAxisCount),
         ),
       ],
     );

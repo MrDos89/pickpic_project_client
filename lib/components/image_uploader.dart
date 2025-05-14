@@ -1,5 +1,6 @@
 // lib/utils/image_uploader.dart
 
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -30,18 +31,18 @@ class ImageUploader {
     }
   }
 
-  /// GCP Cloud Storage Signed URL 방식으로 업로드
-  static Future<void> uploadToCloudStorage({
-    required Future<String> Function(String uuid) getSignedUrl, // 서버에서 signed URL 발급
+  /// 로컬 서버로 TEXT 업로드 방식 복원
+  static Future<void> compressAndUploadMappedImages({
+    required String uploadUrl,
     void Function(String)? onSuccess,
     void Function(String)? onError,
   }) async {
     try {
+      final Map<String, Uint8List> compressedMap = {};
+
       for (final entry in _uuidToAssetMap.entries) {
         final uuid = entry.key;
-        final asset = entry.value;
-
-        final originBytes = await asset.originBytes;
+        final originBytes = await entry.value.originBytes;
         if (originBytes == null) continue;
 
         final compressed = await FlutterImageCompress.compressWithList(
@@ -52,24 +53,26 @@ class ImageUploader {
           format: CompressFormat.jpeg,
         );
 
-        final signedUrl = await getSignedUrl(uuid); // 서버에서 사전 발급
-
-        final response = await http.put(
-          Uri.parse(signedUrl),
-          headers: {
-            'Content-Type': 'image/jpeg',
-          },
-          body: compressed,
-        );
-
-        if (response.statusCode != 200) {
-          onError?.call("❌ $uuid 업로드 실패 (status: ${response.statusCode})");
-        }
+        compressedMap[uuid] = compressed ?? originBytes;
       }
 
-      onSuccess?.call("✅ 전체 업로드 완료");
+      final String payload = compressedMap.entries
+          .map((e) => "${e.key}:${base64Encode(e.value)}")
+          .join('\n');
+
+      final response = await http.post(
+        Uri.parse(uploadUrl),
+        headers: {"Content-Type": "text/plain"},
+        body: payload,
+      );
+
+      if (response.statusCode == 200) {
+        onSuccess?.call("✅ 업로드 성공");
+      } else {
+        onError?.call("❌ 서버 오류: \${response.statusCode}");
+      }
     } catch (e) {
-      onError?.call("오류 발생: $e");
+      onError?.call("전송 오류: \$e");
     }
   }
 

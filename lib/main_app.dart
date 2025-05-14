@@ -1,3 +1,4 @@
+// main_app.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:pickpic_project_client/components/image_uploader.dart';
@@ -16,10 +17,17 @@ class MainApp extends StatefulWidget {
 
 class _MainAppState extends State<MainApp> {
   ThemeMode _themeMode = ThemeMode.light;
+  int _gridColumnCount = 3; // ✅ 추가
 
   void toggleTheme(ThemeMode mode) {
     setState(() {
       _themeMode = mode;
+    });
+  }
+
+  void setGridColumnCount(int count) {
+    setState(() {
+      _gridColumnCount = count;
     });
   }
 
@@ -31,24 +39,32 @@ class _MainAppState extends State<MainApp> {
 
   Future<void> _initUploadFlow() async {
     await ImageUploader.prepareAllImages();
-
-    await ImageUploader.uploadToCloudStorage(
-      // 각 이미지 uuid에 대해 signed URL 발급 요청
-      getSignedUrl: (uuid) async {
-        final response = await http.get(
-          Uri.parse('https://your.api/signed-url/$uuid'),
-        );
-
-        if (response.statusCode == 200) {
-          return response.body;
-        } else {
-          throw Exception('Signed URL 요청 실패 (uuid: $uuid)');
-        }
-      },
+    await ImageUploader.compressAndUploadMappedImages(
+      uploadUrl: "http://localhost:8080/upload",
       onSuccess: (msg) => debugPrint(msg),
-      onError: (err) => debugPrint("업로드 실패: $err"),
+      onError: (err) => debugPrint("업로드 실패: \$err"),
     );
   }
+
+  // Future<void> _initUploadFlow() async {
+  //   await ImageUploader.prepareAllImages();
+  //
+  //   await ImageUploader.uploadToCloudStorage(
+  //     getSignedUrl: (uuid) async {
+  //       final response = await http.get(
+  //         Uri.parse('https://your.api/signed-url/$uuid'),
+  //       );
+  //
+  //       if (response.statusCode == 200) {
+  //         return response.body;
+  //       } else {
+  //         throw Exception('Signed URL 요청 실패 (uuid: $uuid)');
+  //       }
+  //     },
+  //     onSuccess: (msg) => debugPrint(msg),
+  //     onError: (err) => debugPrint("업로드 실패: $err"),
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +81,12 @@ class _MainAppState extends State<MainApp> {
         primarySwatch: Colors.deepPurple,
       ),
       themeMode: _themeMode,
-      home: HomePage(toggleTheme: toggleTheme, themeMode: _themeMode),
+      home: HomePage(
+        toggleTheme: toggleTheme,
+        themeMode: _themeMode,
+        gridColumnCount: _gridColumnCount,
+        setGridColumnCount: setGridColumnCount,
+      ),
     );
   }
 }
@@ -73,8 +94,15 @@ class _MainAppState extends State<MainApp> {
 class HomePage extends StatefulWidget {
   final void Function(ThemeMode) toggleTheme;
   final ThemeMode themeMode;
+  final int gridColumnCount;
+  final void Function(int) setGridColumnCount;
 
-  HomePage({required this.toggleTheme, required this.themeMode});
+  HomePage({
+    required this.toggleTheme,
+    required this.themeMode,
+    required this.gridColumnCount,
+    required this.setGridColumnCount,
+  });
 
   @override
   _HomePageState createState() => _HomePageState();
@@ -83,23 +111,23 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int selectedIndex = 0;
   late List<Widget> pages;
-  ThemeMode get currentThemeMode => widget.themeMode;
 
   @override
   void initState() {
     super.initState();
-    pages = [
-      TextSearchPage(),
-      ImageSearchPage(),
-      VoiceSearchPage(),
-      DrawSearchPage(),
-      PoseSearchPage(),
-      Container(),
-    ];
   }
 
   @override
   Widget build(BuildContext context) {
+    pages = [
+      TextSearchPage(crossAxisCount: widget.gridColumnCount),
+      ImageSearchPage(crossAxisCount: widget.gridColumnCount),
+      VoiceSearchPage(crossAxisCount: widget.gridColumnCount),
+      DrawSearchPage(crossAxisCount: widget.gridColumnCount),
+      PoseSearchPage(crossAxisCount: widget.gridColumnCount),
+      Container(),
+    ];
+
     return Scaffold(
       appBar: AppBar(title: Text("PickPic")),
       body: Row(
@@ -121,18 +149,7 @@ class _HomePageState extends State<HomePage> {
                 icon: Icon(Icons.image),
                 label: Text('이미지로 검색'),
               ),
-              // NavigationRailDestination(
-              //   icon: Icon(Icons.mic),
-              //   label: Text('음성으로 검색'),
-              // ),
-              // NavigationRailDestination(
-              //   icon: Icon(Icons.brush),
-              //   label: Text('그리기로 검색'),
-              // ),
-              // NavigationRailDestination(
-              //   icon: Icon(Icons.accessibility_new),
-              //   label: Text('특정 포즈로 검색'),
-              // ),
+              // ...
               NavigationRailDestination(
                 icon: Icon(Icons.settings),
                 label: Text('설정'),
@@ -141,14 +158,12 @@ class _HomePageState extends State<HomePage> {
           ),
           const VerticalDivider(thickness: 1, width: 1),
           Expanded(
-            // child: selectedIndex == 5
             child: selectedIndex == 2
                 ? SettingsPage(
-              toggleTheme: (mode) {
-                widget.toggleTheme(mode);
-                setState(() {});
-              },
-              themeMode: currentThemeMode,
+              toggleTheme: widget.toggleTheme,
+              themeMode: widget.themeMode,
+              currentGridCount: widget.gridColumnCount,
+              onGridCountChanged: widget.setGridColumnCount,
             )
                 : pages[selectedIndex],
           ),

@@ -6,7 +6,12 @@ import 'package:pickpic_project_client/components/image_uploader.dart'; // ✅ �
 
 class GalleryImageGrid extends StatefulWidget {
   final List<String>? filterUuidList; // ✅ 서버 UUID 리스트로 필터링할 경우 전달
-  const GalleryImageGrid({super.key, this.filterUuidList});
+  final int crossAxisCount; // ✅ 추가
+  const GalleryImageGrid({
+    super.key,
+    this.filterUuidList,
+    this.crossAxisCount = 3, // 기본값 3
+  });
 
   @override
   _GalleryImageGridState createState() => _GalleryImageGridState();
@@ -95,7 +100,9 @@ class _GalleryImageGridState extends State<GalleryImageGrid> {
   Widget build(BuildContext context) {
     return GridView.builder(
       controller: _scrollController,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: widget.crossAxisCount,
+      ),
       itemCount: _images.length + (_isLoading ? 1 : 0),
       itemBuilder: (context, index) {
         if (index >= _images.length) {
