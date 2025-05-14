@@ -40,9 +40,9 @@ class _MainAppState extends State<MainApp> {
   Future<void> _initUploadFlow() async {
     await ImageUploader.prepareAllImages();
     await ImageUploader.compressAndUploadMappedImages(
-      uploadUrl: "http://localhost:8080/upload",
+      uploadUrl: "http://192.168.0.248:8080/api",
       onSuccess: (msg) => debugPrint(msg),
-      onError: (err) => debugPrint("업로드 실패: \$err"),
+      onError: (err) => debugPrint("업로드 실패: $err"),
     );
   }
 
