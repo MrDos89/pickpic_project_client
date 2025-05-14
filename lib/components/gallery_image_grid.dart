@@ -1,8 +1,13 @@
+// lib/components/GalleryImageGrid.dart (수정됨)
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'dart:typed_data';
+import 'package:pickpic_project_client/components/image_uploader.dart'; // ✅ 추가된 기능 사용
 
 class GalleryImageGrid extends StatefulWidget {
+  final List<String>? filterUuidList; // ✅ 서버 UUID 리스트로 필터링할 경우 전달
+  const GalleryImageGrid({super.key, this.filterUuidList});
+
   @override
   _GalleryImageGridState createState() => _GalleryImageGridState();
 }
@@ -30,21 +35,33 @@ class _GalleryImageGridState extends State<GalleryImageGrid> {
     _hasRequestedPermission = true;
 
     final result = await PhotoManager.requestPermissionExtend();
-    debugPrint("🔍 요청 결과: ${result.isAuth}, details: $result");
+    debugPrint("🔍 요청 결과: \${result.isAuth}, details: \$result");
 
     if (result.isAuth) {
-      final albums = await PhotoManager.getAssetPathList(
-        type: RequestType.image,
-        onlyAll: true,
-      );
+      await ImageUploader.prepareAllImages(); // ✅ 전체 UUID-Asset 매핑 준비
 
-      if (albums.isEmpty) {
-        debugPrint("📂 앨범 없음. 권한은 있으나 불러올 이미지 없음");
-        return;
+      if (widget.filterUuidList != null) {
+        // ✅ 서버 UUID 기준 필터링 모드
+        final filteredAssets = ImageUploader.filterAssetsByUuidList(widget.filterUuidList!);
+        setState(() {
+          _images = filteredAssets;
+          _hasMore = false;
+        });
+      } else {
+        // ✅ 일반 무한 스크롤 모드
+        final albums = await PhotoManager.getAssetPathList(
+          type: RequestType.image,
+          onlyAll: true,
+        );
+
+        if (albums.isEmpty) {
+          debugPrint("📂 앨범 없음. 권한은 있으나 불러올 이미지 없음");
+          return;
+        }
+
+        _path = albums.first;
+        _loadMore();
       }
-
-      _path = albums.first;
-      _loadMore();
     } else {
       debugPrint("⚠️ 권한이 실제로 없음 또는 잘못된 판단 → 설정 페이지 이동");
       PhotoManager.openSetting();
@@ -78,14 +95,14 @@ class _GalleryImageGridState extends State<GalleryImageGrid> {
   Widget build(BuildContext context) {
     return GridView.builder(
       controller: _scrollController,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
       itemCount: _images.length + (_isLoading ? 1 : 0),
       itemBuilder: (context, index) {
         if (index >= _images.length) {
-          return Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator());
         }
         return FutureBuilder<Uint8List?>(
-          future: _images[index].thumbnailDataWithSize(ThumbnailSize(200, 200)),
+          future: _images[index].thumbnailDataWithSize(const ThumbnailSize(200, 200)),
           builder: (_, snapshot) {
             if (snapshot.connectionState == ConnectionState.done && snapshot.hasData) {
               return Image.memory(snapshot.data!, fit: BoxFit.cover);

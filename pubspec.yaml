@@ -38,6 +38,11 @@ dependencies:
   speech_to_text: ^7.0.0
   photo_manager:
     path: patches/photo_manager
+  image_picker: ^1.0.7
+  flutter_image_compress: ^2.1.0
+  uuid: ^4.2.2
+  http: ^0.13.6
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

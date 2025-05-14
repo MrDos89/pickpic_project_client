@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:pickpic_project_client/components/GalleryImageGrid.dart';
+import 'package:pickpic_project_client/components/gallery_image_grid.dart';
 
 class VoiceSearchPage extends StatefulWidget {
   final stt.SpeechToText? injectedSpeech;

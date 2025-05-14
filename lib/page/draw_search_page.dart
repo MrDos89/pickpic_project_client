@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pickpic_project_client/components/GalleryImageGrid.dart';
+import 'package:pickpic_project_client/components/gallery_image_grid.dart';
 
 class DrawSearchPage extends StatefulWidget {
   @override
