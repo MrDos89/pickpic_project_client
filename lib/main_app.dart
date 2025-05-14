@@ -1,53 +1,159 @@
-// lib/main_app.dart
-
 import 'package:flutter/material.dart';
-import 'package:pickpic_project_client/components/gallery_image_grid.dart';
+import 'package:flutter/foundation.dart';
 import 'package:pickpic_project_client/components/image_uploader.dart';
+import 'page/text_search_page.dart';
+import 'page/image_search_page.dart';
+import 'page/voice_search_page.dart';
+import 'page/draw_search_page.dart';
+import 'page/pose_search_page.dart';
+import 'page/settings_page.dart';
+import 'package:http/http.dart' as http;
 
 class MainApp extends StatefulWidget {
-  const MainApp({super.key});
-
   @override
   State<MainApp> createState() => _MainAppState();
 }
 
 class _MainAppState extends State<MainApp> {
-  List<String>? _serverUuidList;
-  bool _isUploading = true;
+  ThemeMode _themeMode = ThemeMode.light;
+
+  void toggleTheme(ThemeMode mode) {
+    setState(() {
+      _themeMode = mode;
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    _prepareAndUploadImages();
+    _initUploadFlow();
   }
 
-  Future<void> _prepareAndUploadImages() async {
+  Future<void> _initUploadFlow() async {
     await ImageUploader.prepareAllImages();
 
-    await ImageUploader.compressAndUploadMappedImages(
-      uploadUrl: "https://your.api/upload",
-      onSuccess: (msg) {
-        debugPrint(msg);
-        // ✅ 서버에서 UUID 리스트 받았다고 가정 (샘플)
-        setState(() {
-          _serverUuidList = ImageUploader.uuidAssetMap.keys.take(20).toList();
-          _isUploading = false;
-        });
+    await ImageUploader.uploadToCloudStorage(
+      // 각 이미지 uuid에 대해 signed URL 발급 요청
+      getSignedUrl: (uuid) async {
+        final response = await http.get(
+          Uri.parse('https://your.api/signed-url/$uuid'),
+        );
+
+        if (response.statusCode == 200) {
+          return response.body;
+        } else {
+          throw Exception('Signed URL 요청 실패 (uuid: $uuid)');
+        }
       },
-      onError: (err) {
-        debugPrint(err);
-        setState(() => _isUploading = false);
-      },
+      onSuccess: (msg) => debugPrint(msg),
+      onError: (err) => debugPrint("업로드 실패: $err"),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'PickPic',
+      theme: ThemeData(
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: Colors.white,
+        primarySwatch: Colors.deepPurple,
+      ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: Colors.black,
+        primarySwatch: Colors.deepPurple,
+      ),
+      themeMode: _themeMode,
+      home: HomePage(toggleTheme: toggleTheme, themeMode: _themeMode),
+    );
+  }
+}
+
+class HomePage extends StatefulWidget {
+  final void Function(ThemeMode) toggleTheme;
+  final ThemeMode themeMode;
+
+  HomePage({required this.toggleTheme, required this.themeMode});
+
+  @override
+  _HomePageState createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int selectedIndex = 0;
+  late List<Widget> pages;
+  ThemeMode get currentThemeMode => widget.themeMode;
+
+  @override
+  void initState() {
+    super.initState();
+    pages = [
+      TextSearchPage(),
+      ImageSearchPage(),
+      VoiceSearchPage(),
+      DrawSearchPage(),
+      PoseSearchPage(),
+      Container(),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("PickPic")),
-      body: _isUploading
-          ? const Center(child: CircularProgressIndicator())
-          : GalleryImageGrid(filterUuidList: _serverUuidList),
+      appBar: AppBar(title: Text("PickPic")),
+      body: Row(
+        children: [
+          NavigationRail(
+            selectedIndex: selectedIndex,
+            onDestinationSelected: (int index) {
+              setState(() {
+                selectedIndex = index;
+              });
+            },
+            labelType: NavigationRailLabelType.all,
+            destinations: const [
+              NavigationRailDestination(
+                icon: Icon(Icons.text_fields),
+                label: Text('텍스트로 검색'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.image),
+                label: Text('이미지로 검색'),
+              ),
+              // NavigationRailDestination(
+              //   icon: Icon(Icons.mic),
+              //   label: Text('음성으로 검색'),
+              // ),
+              // NavigationRailDestination(
+              //   icon: Icon(Icons.brush),
+              //   label: Text('그리기로 검색'),
+              // ),
+              // NavigationRailDestination(
+              //   icon: Icon(Icons.accessibility_new),
+              //   label: Text('특정 포즈로 검색'),
+              // ),
+              NavigationRailDestination(
+                icon: Icon(Icons.settings),
+                label: Text('설정'),
+              ),
+            ],
+          ),
+          const VerticalDivider(thickness: 1, width: 1),
+          Expanded(
+            // child: selectedIndex == 5
+            child: selectedIndex == 2
+                ? SettingsPage(
+              toggleTheme: (mode) {
+                widget.toggleTheme(mode);
+                setState(() {});
+              },
+              themeMode: currentThemeMode,
+            )
+                : pages[selectedIndex],
+          ),
+        ],
+      ),
     );
   }
 }
