@@ -1,19 +1,17 @@
-// lib/utils/image_uploader.dart
-
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:uuid/uuid.dart';
 import 'package:http/http.dart' as http;
+// import 'package:wifi_info_plus/wifi_info_plus.dart'; // SSID 가져오기용
 
 class ImageUploader {
   static final Map<String, AssetEntity> _uuidToAssetMap = {};
 
   static Map<String, AssetEntity> get uuidAssetMap => _uuidToAssetMap;
 
-  static Future<void> prepareAllImages({int maxCount = 300}) async {
+  static Future<void> prepareAllImages({int maxCount = 999 }) async {
     final permission = await PhotoManager.requestPermissionExtend();
     if (!permission.isAuth) return;
 
@@ -32,13 +30,20 @@ class ImageUploader {
     }
   }
 
-  /// 하나씩 base64 인코딩하여 개별 POST 전송
   static Future<void> compressAndUploadMappedImages({
     required String uploadUrl,
     void Function(String)? onSuccess,
     void Function(String)? onError,
   }) async {
     try {
+      final stopwatch = Stopwatch()..start();
+
+      // final wifiInfo = WifiInfo(); // SSID 가져오기
+      // final ssid = await wifiInfo.getWifiName() ?? "unknown";
+      final ssid = await "test";
+
+      final List<Map<String, dynamic>> imageList = [];
+
       for (final entry in _uuidToAssetMap.entries.toList()) {
         final uuid = entry.key;
         final originBytes = await entry.value.originBytes;
@@ -62,22 +67,34 @@ class ImageUploader {
 
         final data = compressed ?? originBytes;
         final base64Image = base64Encode(data);
-        final payload = "$base64Image";
-        debugPrint("전송할 base64 (앞 100자): ${payload.substring(0, 100)}");
-        final response = await http.post(
-          Uri.parse(uploadUrl + "/$uuid"),
-          headers: {"Content-Type": "text/plain"},
-          body: payload,
-        );
 
-        if (response.statusCode != 200) {
-          debugPrint("서버 응답 코드: ${response.statusCode}");
-          debugPrint("서버 응답 본문: ${response.body}");
-          onError?.call("❌ $uuid 업로드 실패 (status: ${response.statusCode}, body: ${response.body})");
-        }
+        imageList.add({
+          "image_data": base64Image,
+          "ssid": ssid,
+          "index": uuid,
+        });
       }
 
-      onSuccess?.call("✅ 전체 업로드 완료");
+      final jsonPayload = jsonEncode({"images": imageList});
+
+      debugPrint("전송할 JSON 배열 (앞 100자): ${jsonPayload.substring(0, 100)}");
+
+      final response = await http.post(
+        Uri.parse(uploadUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonPayload,
+      );
+
+      stopwatch.stop();
+      debugPrint("⏱️ 전송 소요 시간: ${stopwatch.elapsedMilliseconds}ms");
+
+      if (response.statusCode != 200) {
+        debugPrint("서버 응답 코드: ${response.statusCode}");
+        debugPrint("서버 응답 본문: ${response.body}");
+        onError?.call("❌ 일괄 업로드 실패 (status: ${response.statusCode}, body: ${response.body})");
+      } else {
+        onSuccess?.call("✅ 전체 업로드 완료");
+      }
     } catch (e) {
       onError?.call("전송 오류: " + e.toString());
     }

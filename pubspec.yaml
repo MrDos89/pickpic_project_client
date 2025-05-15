@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   permission_handler: ^11.0.0
   speech_to_text: ^7.0.0
+
   photo_manager:
     path: patches/photo_manager
   image_picker: ^1.0.7
