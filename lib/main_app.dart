@@ -122,9 +122,9 @@ class _HomePageState extends State<HomePage> {
     pages = [
       TextSearchPage(crossAxisCount: widget.gridColumnCount),
       ImageSearchPage(crossAxisCount: widget.gridColumnCount),
+      PoseSearchPage(crossAxisCount: widget.gridColumnCount),
       VoiceSearchPage(crossAxisCount: widget.gridColumnCount),
       DrawSearchPage(crossAxisCount: widget.gridColumnCount),
-      PoseSearchPage(crossAxisCount: widget.gridColumnCount),
       Container(),
     ];
 
@@ -149,6 +149,10 @@ class _HomePageState extends State<HomePage> {
                 icon: Icon(Icons.image),
                 label: Text('이미지로 검색'),
               ),
+              NavigationRailDestination(
+                icon: Icon(Icons.image),
+                label: Text('포즈로 분류'),
+              ),
               // ...
               NavigationRailDestination(
                 icon: Icon(Icons.settings),
@@ -158,7 +162,7 @@ class _HomePageState extends State<HomePage> {
           ),
           const VerticalDivider(thickness: 1, width: 1),
           Expanded(
-            child: selectedIndex == 2
+            child: selectedIndex == 3
                 ? SettingsPage(
               toggleTheme: widget.toggleTheme,
               themeMode: widget.themeMode,
