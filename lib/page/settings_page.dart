@@ -1,18 +1,13 @@
-// settings_page.dart
 import 'package:flutter/material.dart';
 
 class SettingsPage extends StatelessWidget {
   final void Function(ThemeMode) toggleTheme;
   final ThemeMode themeMode;
-  final int currentGridCount;
-  final void Function(int) onGridCountChanged;
 
   const SettingsPage({
     super.key,
     required this.toggleTheme,
     required this.themeMode,
-    required this.currentGridCount,
-    required this.onGridCountChanged,
   });
 
   @override
@@ -39,18 +34,6 @@ class SettingsPage extends StatelessWidget {
               onChanged: (value) => toggleTheme(value!),
             ),
           ),
-          const Divider(),
-          const SizedBox(height: 16),
-          Text("그리드 열 수: $currentGridCount"),
-          Slider(
-            value: currentGridCount.toDouble(),
-            min: 2,
-            max: 5,
-            divisions: 3,
-            label: '$currentGridCount',
-            onChanged: (value) => onGridCountChanged(value.toInt()),
-          ),
-          const Divider(),
         ],
       ),
     );
