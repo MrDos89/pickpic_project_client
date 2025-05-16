@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 // import 'package:wifi_info_plus/wifi_info_plus.dart';
+import 'package:pickpic_project_client/page/loading_overlay.dart';
 
 class ImageUploader {
   static final Map<String, AssetEntity> _uuidToAssetMap = {};
@@ -31,85 +33,138 @@ class ImageUploader {
     }
   }
 
-  // compute에서 사용할 isolate-safe 함수
-  static Future<Uint8List> compressInIsolate(Map<String, dynamic> data) async {
-    final List<int> inputBytes = List<int>.from(data['bytes']);
-    return await FlutterImageCompress.compressWithList(
-      Uint8List.fromList(inputBytes),
-      minWidth: data['minWidth'],
-      minHeight: data['minHeight'],
-      quality: data['quality'],
-      format: CompressFormat.jpeg,
-    ) ?? Uint8List.fromList(inputBytes);
-  }
-
-  static Future<void> compressAndUploadMappedImagesParallel({
+  static Future<void> compressAndBatchUploadImages({
+    required BuildContext context,
     required String uploadUrl,
     void Function(String)? onSuccess,
     void Function(String)? onError,
   }) async {
+    LoadingOverlay.show(context, message: "업로드 중... 연결 확인 중입니다");
     final stopwatch = Stopwatch()..start();
+    final ssid = "edlag12345sd3sdf!da";
 
     try {
-      // final wifiInfo = WifiInfo();
-      // final ssid = await wifiInfo.getWifiName() ?? "unknown";
-      final ssid = "test";
+      final List<Map<String, dynamic>> imagePayloads = [];
+      int skipped = 0;
 
-      final tasks = <Future<void>>[];
-
-      for (final entry in _uuidToAssetMap.entries) {
+      for (final entry in List<MapEntry<String, AssetEntity>>.from(_uuidToAssetMap.entries)) {
         final uuid = entry.key;
         final entity = entry.value;
 
-        final originBytes = await entity.originBytes;
-        if (originBytes == null) continue;
+        Uint8List? originBytes;
+        try {
+          originBytes = await entity.originBytes;
+          if (originBytes == null || originBytes.isEmpty) {
+            debugPrint("🚫 [$uuid] originBytes 로딩 실패 → 업로드 스킵");
+            skipped++;
+            continue;
+          }
+        } catch (e) {
+          debugPrint("🚫 [$uuid] originBytes 예외 발생: $e → 업로드 스킵");
+          skipped++;
+          continue;
+        }
 
         final size = await entity.size;
         final isLandscape = size.width >= size.height;
         final minWidth = isLandscape ? 256 : (256 * size.width / size.height).round();
         final minHeight = isLandscape ? (256 * size.height / size.width).round() : 256;
 
-        final task = compute(compressInIsolate, {
-          'bytes': originBytes,
-          'minWidth': minWidth,
-          'minHeight': minHeight,
-          'quality': 80,
-        }).then((compressedBytes) async {
-          final base64Image = base64Encode(compressedBytes);
-          final payload = jsonEncode({
-            "context": base64Image,
-            "ssid": ssid,
-          });
+        Uint8List compressedBytes;
+        try {
+          compressedBytes = await FlutterImageCompress.compressWithList(
+            originBytes,
+            minWidth: minWidth,
+            minHeight: minHeight,
+            quality: 80,
+            format: CompressFormat.jpeg,
+          ) ?? originBytes;
+        } catch (e) {
+          debugPrint("⚠️ [$uuid] 압축 실패, 원본 사용");
+          compressedBytes = originBytes;
+        }
 
-          final response = await http.post(
-            Uri.parse('$uploadUrl/$uuid'),
-            headers: {"Content-Type": "application/json"},
-            body: payload,
-          );
+        final base64Image = base64Encode(compressedBytes);
 
-          if (response.statusCode != 200) {
-            debugPrint("❌ $uuid 업로드 실패: ${response.statusCode}");
-            onError?.call("❌ $uuid 업로드 실패 (body: ${response.body})");
-          }
+        imagePayloads.add({
+          "uid": uuid,
+          "image_data": base64Image,
+          "ssid": ssid,
         });
-
-        tasks.add(task);
       }
 
-      await Future.wait(tasks);
+      final jsonPayload = jsonEncode({"images": imagePayloads});
 
-      stopwatch.stop();
-      final elapsed = stopwatch.elapsed.inMilliseconds;
-      debugPrint("✅ 전체 작업 완료 (${tasks.length}개), 소요 시간: ${elapsed}ms");
+      try {
+        final response = await http.post(
+          Uri.parse(uploadUrl),
+          headers: {"Content-Type": "application/json"},
+          body: jsonPayload,
+        );
 
-      onSuccess?.call("✅ 전체 업로드 완료 (${tasks.length}개), 시간: ${elapsed}ms");
+        stopwatch.stop();
+
+        if (response.statusCode == 200) {
+          final msg = "✅ ${imagePayloads.length}개 업로드 성공 / $skipped개 스킵됨 ⏱ ${stopwatch.elapsedMilliseconds}ms";
+          debugPrint(msg);
+          onSuccess?.call(msg);
+        } else {
+          debugPrint("❌ 업로드 실패: status=${response.statusCode}, body=${response.body}");
+          onError?.call("❌ 서버 응답 오류: ${response.statusCode} (${response.body})");
+        }
+      } catch (e) {
+        stopwatch.stop();
+        debugPrint("❌ 업로드 중 네트워크 예외 발생: $e");
+        onError?.call("❌ 네트워크 오류로 업로드 실패: $e");
+      }
     } catch (e) {
       stopwatch.stop();
-      onError?.call("전송 오류: ${e.toString()} (⏱ ${stopwatch.elapsed.inMilliseconds}ms)");
+      onError?.call("전체 처리 중 예외 발생: $e (⏱ ${stopwatch.elapsedMilliseconds}ms)");
+    } finally {
+      LoadingOverlay.hide(context);
     }
   }
 
   static List<AssetEntity> filterAssetsByUuidList(List<String> uuidList) {
-    return uuidList.map((uuid) => _uuidToAssetMap[uuid]).whereType<AssetEntity>().toList();
+    return uuidList
+        .map((uuid) => _uuidToAssetMap[uuid])
+        .whereType<AssetEntity>()
+        .toList();
+  }
+
+  static final Map<String, List<String>> _poseToUuidListMap = {};
+
+  static Map<String, List<String>> get poseToUuidListMap => _poseToUuidListMap;
+
+  static const Map<String, String> _poseKorToEng = {
+    '만세 포즈': 'hands_up',
+    '점프샷 포즈': 'jump_shot',
+    '서있는 포즈': 'standing',
+    '앉은 포즈': 'sitting',
+    '누워있는 포즈': 'lying',
+    '브이 손동작 포즈': 'v_sign',
+    '하트 손동작 포즈': 'heart_sign',
+    '최고 손동작 포즈': 'thumbs_up',
+  };
+
+  static Future<void> fetchAllPoseUuidListsFromServer() async {
+    for (final poseKor in _poseKorToEng.keys) {
+      final poseEng = _poseKorToEng[poseKor];
+      if (poseEng == null) continue;
+
+      try {
+        final response = await http.get(Uri.parse("http://192.168.0.247:8080/pose/$poseEng"));
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data is List) {
+            _poseToUuidListMap[poseKor] = List<String>.from(data);
+          }
+        } else {
+          debugPrint("❌ [$poseKor] 응답 실패: ${response.statusCode}");
+        }
+      } catch (e) {
+        debugPrint("❌ [$poseKor] UUID 리스트 가져오기 실패: $e");
+      }
+    }
   }
 }

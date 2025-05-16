@@ -7,6 +7,7 @@ import 'page/voice_search_page.dart';
 import 'page/draw_search_page.dart';
 import 'page/pose_search_page.dart';
 import 'page/settings_page.dart';
+import 'package:pickpic_project_client/page/loading_overlay.dart';
 
 class MainApp extends StatefulWidget {
   @override
@@ -25,16 +26,26 @@ class _MainAppState extends State<MainApp> {
   @override
   void initState() {
     super.initState();
-    _initUploadFlow();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initUploadFlow(); // ✅ context가 완전히 살아 있는 시점에 실행
+    });
   }
 
   Future<void> _initUploadFlow() async {
+    LoadingOverlay.show(context, message: "이미지 업로드 준비 중...");
+
     await ImageUploader.prepareAllImages();
-    await ImageUploader.compressAndUploadMappedImagesParallel(
-      uploadUrl: "http://192.168.0.248:8080/file",
+    await ImageUploader.compressAndBatchUploadImages(
+      context: context,
+      uploadUrl: "http://192.168.0.247:8080/file",
       onSuccess: (msg) => debugPrint(msg),
       onError: (err) => debugPrint("업로드 실패: $err"),
     );
+
+    // ✅ 포즈별 UUID 리스트 캐싱
+    await ImageUploader.fetchAllPoseUuidListsFromServer();
+
+    LoadingOverlay.hide(context);
   }
 
   @override

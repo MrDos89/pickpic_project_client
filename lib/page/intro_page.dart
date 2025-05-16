@@ -1,10 +1,10 @@
+// intro_page.dart
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'dart:io'; // 플랫폼 분기용
+import 'package:pickpic_project_client/main_app.dart';
 
 class IntroPage extends StatefulWidget {
-  final VoidCallback onPermissionGranted;
-  const IntroPage({super.key, required this.onPermissionGranted});
+  const IntroPage({super.key});
 
   @override
   State<IntroPage> createState() => _IntroPageState();
@@ -32,14 +32,14 @@ class _IntroPageState extends State<IntroPage>
     super.dispose();
   }
 
-  Future<void> _handleTap(BuildContext context) async {
-    // 권한 상태 먼저 확인
+  Future<void> _handleTap() async {
     final photoStatus = await Permission.photos.status;
     final micStatus = await Permission.microphone.status;
 
-    // permanentlyDenied인 경우 설정화면 유도
+    if (!mounted) return;
+
     if (photoStatus.isPermanentlyDenied || micStatus.isPermanentlyDenied) {
-      showDialog(
+      await showDialog(
         context: context,
         builder: (_) => AlertDialog(
           title: const Text("권한 설정 필요"),
@@ -47,7 +47,7 @@ class _IntroPageState extends State<IntroPage>
           actions: [
             TextButton(
               onPressed: () {
-                openAppSettings(); // 앱 설정으로 이동
+                openAppSettings();
                 Navigator.of(context).pop();
               },
               child: const Text("설정으로 이동"),
@@ -62,19 +62,22 @@ class _IntroPageState extends State<IntroPage>
       return;
     }
 
-    // 일반적인 요청 (거절 상태 포함)
     final statuses = await [
       Permission.photos,
       Permission.microphone,
     ].request();
 
+    if (!mounted) return;
+
     final allGranted = statuses.values.every((status) => status.isGranted);
 
     if (allGranted) {
-      widget.onPermissionGranted(); // ✅ MainApp 진입
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => MainApp()),
+      );
     } else {
-      // ❌ 거절 상태일 경우 재요청 가능
-      showDialog(
+      await showDialog(
         context: context,
         builder: (_) => AlertDialog(
           title: const Text("권한 부족"),
@@ -93,7 +96,7 @@ class _IntroPageState extends State<IntroPage>
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => _handleTap(context),
+      onTap: _handleTap,
       child: Scaffold(
         backgroundColor: Colors.white,
         body: Center(
