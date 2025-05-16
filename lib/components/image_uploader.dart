@@ -1,10 +1,11 @@
 import 'dart:convert';
-import 'package:flutter/cupertino.dart';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'package:uuid/uuid.dart';
 import 'package:http/http.dart' as http;
-// import 'package:wifi_info_plus/wifi_info_plus.dart'; // SSID 가져오기용
+import 'package:uuid/uuid.dart';
+// import 'package:wifi_info_plus/wifi_info_plus.dart';
 
 class ImageUploader {
   static final Map<String, AssetEntity> _uuidToAssetMap = {};
@@ -30,73 +31,81 @@ class ImageUploader {
     }
   }
 
-  static Future<void> compressAndUploadMappedImages({
+  // compute에서 사용할 isolate-safe 함수
+  static Future<Uint8List> compressInIsolate(Map<String, dynamic> data) async {
+    final List<int> inputBytes = List<int>.from(data['bytes']);
+    return await FlutterImageCompress.compressWithList(
+      Uint8List.fromList(inputBytes),
+      minWidth: data['minWidth'],
+      minHeight: data['minHeight'],
+      quality: data['quality'],
+      format: CompressFormat.jpeg,
+    ) ?? Uint8List.fromList(inputBytes);
+  }
+
+  static Future<void> compressAndUploadMappedImagesParallel({
     required String uploadUrl,
     void Function(String)? onSuccess,
     void Function(String)? onError,
   }) async {
+    final stopwatch = Stopwatch()..start();
+
     try {
-      final stopwatch = Stopwatch()..start();
-
-      // final wifiInfo = WifiInfo(); // SSID 가져오기
+      // final wifiInfo = WifiInfo();
       // final ssid = await wifiInfo.getWifiName() ?? "unknown";
-      final ssid = await "test";
+      final ssid = "test";
 
-      final List<Map<String, dynamic>> imageList = [];
+      final tasks = <Future<void>>[];
 
-      for (final entry in _uuidToAssetMap.entries.toList()) {
+      for (final entry in _uuidToAssetMap.entries) {
         final uuid = entry.key;
-        final originBytes = await entry.value.originBytes;
+        final entity = entry.value;
+
+        final originBytes = await entity.originBytes;
         if (originBytes == null) continue;
 
-        final size = await entry.value.size;
-        final int width = size.width.toInt();
-        final int height = size.height.toInt();
+        final size = await entity.size;
+        final isLandscape = size.width >= size.height;
+        final minWidth = isLandscape ? 256 : (256 * size.width / size.height).round();
+        final minHeight = isLandscape ? (256 * size.height / size.width).round() : 256;
 
-        final bool isLandscape = width >= height;
-        final int targetWidth = isLandscape ? 256 : (256 * width / height).round();
-        final int targetHeight = isLandscape ? (256 * height / width).round() : 256;
+        final task = compute(compressInIsolate, {
+          'bytes': originBytes,
+          'minWidth': minWidth,
+          'minHeight': minHeight,
+          'quality': 80,
+        }).then((compressedBytes) async {
+          final base64Image = base64Encode(compressedBytes);
+          final payload = jsonEncode({
+            "context": base64Image,
+            "ssid": ssid,
+          });
 
-        final compressed = await FlutterImageCompress.compressWithList(
-          originBytes,
-          minWidth: targetWidth,
-          minHeight: targetHeight,
-          quality: 80,
-          format: CompressFormat.jpeg,
-        );
+          final response = await http.post(
+            Uri.parse('$uploadUrl/$uuid'),
+            headers: {"Content-Type": "application/json"},
+            body: payload,
+          );
 
-        final data = compressed ?? originBytes;
-        final base64Image = base64Encode(data);
-
-        imageList.add({
-          "image_data": base64Image,
-          "ssid": ssid,
-          "index": uuid,
+          if (response.statusCode != 200) {
+            debugPrint("❌ $uuid 업로드 실패: ${response.statusCode}");
+            onError?.call("❌ $uuid 업로드 실패 (body: ${response.body})");
+          }
         });
+
+        tasks.add(task);
       }
 
-      final jsonPayload = jsonEncode({"images": imageList});
-
-      debugPrint("전송할 JSON 배열 (앞 100자): ${jsonPayload.substring(0, 100)}");
-
-      final response = await http.post(
-        Uri.parse(uploadUrl),
-        headers: {"Content-Type": "application/json"},
-        body: jsonPayload,
-      );
+      await Future.wait(tasks);
 
       stopwatch.stop();
-      debugPrint("⏱️ 전송 소요 시간: ${stopwatch.elapsedMilliseconds}ms");
+      final elapsed = stopwatch.elapsed.inMilliseconds;
+      debugPrint("✅ 전체 작업 완료 (${tasks.length}개), 소요 시간: ${elapsed}ms");
 
-      if (response.statusCode != 200) {
-        debugPrint("서버 응답 코드: ${response.statusCode}");
-        debugPrint("서버 응답 본문: ${response.body}");
-        onError?.call("❌ 일괄 업로드 실패 (status: ${response.statusCode}, body: ${response.body})");
-      } else {
-        onSuccess?.call("✅ 전체 업로드 완료");
-      }
+      onSuccess?.call("✅ 전체 업로드 완료 (${tasks.length}개), 시간: ${elapsed}ms");
     } catch (e) {
-      onError?.call("전송 오류: " + e.toString());
+      stopwatch.stop();
+      onError?.call("전송 오류: ${e.toString()} (⏱ ${stopwatch.elapsed.inMilliseconds}ms)");
     }
   }
 
