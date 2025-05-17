@@ -60,8 +60,8 @@ class _TextSearchPageState extends State<TextSearchPage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data is Map && data['results'] is List) {
-          final results = data['results'] as List;
+        if (data is List) {
+          final results = data;
           final filenames = results
               .map((item) => item['filename'])
               .whereType<String>()
