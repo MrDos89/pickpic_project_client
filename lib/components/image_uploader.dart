@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:http/http.dart' as http;
@@ -36,6 +37,52 @@ class ImageUploader {
     }
   }
 
+  static Future<Uint8List> _compressImageWithParams(Uint8List bytes, int minWidth, int minHeight) async {
+    try {
+      final result = await FlutterImageCompress.compressWithList(
+        bytes,
+        minWidth: minWidth,
+        minHeight: minHeight,
+        quality: 80,
+        format: CompressFormat.jpeg,
+      );
+      return result;
+    } catch (e) {
+      debugPrint("⚠️ 압축 실패, 원본 사용: $e");
+      return bytes;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> _processAsset(MapEntry<String, AssetEntity> entry) async {
+    try {
+      final uuid = entry.key;
+      final entity = entry.value;
+      final originBytes = await entity.originBytes;
+      if (originBytes == null || originBytes.isEmpty) {
+        debugPrint("🚫 [$uuid] originBytes 로딩 실패 → 업로드 스킵");
+        return null;
+      }
+
+      final size = await entity.size;
+      final isLandscape = size.width >= size.height;
+      final minWidth = isLandscape ? 256 : (256 * size.width / size.height).round();
+      final minHeight = isLandscape ? (256 * size.height / size.width).round() : 256;
+
+      final compressedBytes = await _compressImageWithParams(originBytes, minWidth, minHeight);
+      final base64Image = base64Encode(compressedBytes);
+
+      return {
+        "uid": uuid,
+        "image_data": base64Image,
+        "ssid": "test",
+      };
+    } catch (e, stack) {
+      debugPrint("❌ 예외 발생: $e");
+      debugPrint("⛔ Stacktrace: $stack");
+      return null;
+    }
+  }
+
   static Future<void> compressAndBatchUploadImages({
     required BuildContext context,
     required String uploadUrl,
@@ -44,81 +91,29 @@ class ImageUploader {
   }) async {
     LoadingOverlay.show(context, message: "업로드 중... 연결 확인 중입니다");
     final stopwatch = Stopwatch()..start();
-    final ssid = "edlag12345sd3sdf!da";
 
     try {
-      final List<Map<String, dynamic>> imagePayloads = [];
-      int skipped = 0;
-
-      for (final entry in _uuidToAssetMap.entries) {
-        final uuid = entry.key;
-        final entity = entry.value;
-
-        Uint8List? originBytes;
-        try {
-          originBytes = await entity.originBytes;
-          if (originBytes == null || originBytes.isEmpty) {
-            debugPrint("🚫 [$uuid] originBytes 로딩 실패 → 업로드 스킵");
-            skipped++;
-            continue;
-          }
-        } catch (e) {
-          debugPrint("🚫 [$uuid] originBytes 예외 발생: $e → 업로드 스킵");
-          skipped++;
-          continue;
-        }
-
-        final size = await entity.size;
-        final isLandscape = size.width >= size.height;
-        final minWidth = isLandscape ? 256 : (256 * size.width / size.height).round();
-        final minHeight = isLandscape ? (256 * size.height / size.width).round() : 256;
-
-        Uint8List compressedBytes;
-        try {
-          compressedBytes = await FlutterImageCompress.compressWithList(
-            originBytes,
-            minWidth: minWidth,
-            minHeight: minHeight,
-            quality: 80,
-            format: CompressFormat.jpeg,
-          ) ?? originBytes;
-        } catch (e) {
-          debugPrint("⚠️ [$uuid] 압축 실패, 원본 사용");
-          compressedBytes = originBytes;
-        }
-
-        final base64Image = base64Encode(compressedBytes);
-
-        imagePayloads.add({
-          "uid": uuid,
-          "image_data": base64Image,
-          "ssid": ssid,
-        });
-      }
+      final tasks = _uuidToAssetMap.entries.map((e) => _processAsset(e));
+      final results = await Future.wait(tasks);
+      final imagePayloads = results.whereType<Map<String, dynamic>>().toList();
 
       final jsonPayload = jsonEncode({"images": imagePayloads});
 
-      try {
-        final response = await http.post(
-          Uri.parse(uploadUrl),
-          headers: {"Content-Type": "application/json"},
-          body: jsonPayload,
-        );
+      final response = await http.post(
+        Uri.parse(uploadUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonPayload,
+      );
 
-        stopwatch.stop();
+      stopwatch.stop();
 
-        if (response.statusCode == 200) {
-          final msg = "✅ ${imagePayloads.length}개 업로드 성공 / $skipped개 스킵됨 ⏱ ${stopwatch.elapsedMilliseconds}ms";
-          debugPrint(msg);
-          onSuccess?.call(msg);
-        } else {
-          debugPrint("❌ 업로드 실패: status=${response.statusCode}, body=${response.body}");
-          onError?.call("❌ 서버 응답 오류: ${response.statusCode} (${response.body})");
-        }
-      } catch (e) {
-        stopwatch.stop();
-        debugPrint("❌ 업로드 중 네트워크 예외 발생: $e");
-        onError?.call("❌ 네트워크 오류로 업로드 실패: $e");
+      if (response.statusCode == 200) {
+        final msg = "✅ ${imagePayloads.length}개 업로드 성공 / ⏱ ${stopwatch.elapsedMilliseconds}ms";
+        debugPrint(msg);
+        onSuccess?.call(msg);
+      } else {
+        debugPrint("❌ 업로드 실패: status=${response.statusCode}, body=${response.body}");
+        onError?.call("❌ 서버 응답 오류: ${response.statusCode} (${response.body})");
       }
     } catch (e) {
       stopwatch.stop();
@@ -164,18 +159,28 @@ class ImageUploader {
 
   static Future<void> fetchAllPoseUuidListsFromServer() async {
     for (final poseKor in _poseKorToKeyword.keys) {
-      final poseEng = _poseKorToKeyword[poseKor];
-      if (poseEng == null) continue;
+      final keyword = _poseKorToKeyword[poseKor];
+      if (keyword == null) continue;
 
       try {
-        final response = await http.get(Uri.parse("http://192.168.0.248:8080/pose/$poseEng"));
+        final response = await http.post(
+          Uri.parse("http://192.168.0.248:8080/data/txt2img"),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({"ssid": "test", "keyword": keyword}),
+        );
+
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          if (data is List) {
-            _poseToUuidListMap[poseKor] = List<String>.from(data);
+          if (data is Map && data['results'] is List) {
+            final filenames = (data['results'] as List)
+                .map((item) => item['filename'])
+                .whereType<String>()
+                .map((name) => name.replaceAll('.jpg', ''))
+                .toList();
+            _poseToUuidListMap[poseKor] = filenames;
           }
         } else {
-          debugPrint("❌ [$poseKor] 응답 실패: ${response.statusCode}");
+          debugPrint("❌ [$poseKor] 응답 실패: ${response.statusCode} (${response.body})");
         }
       } catch (e) {
         debugPrint("❌ [$poseKor] UUID 리스트 가져오기 실패: $e");
