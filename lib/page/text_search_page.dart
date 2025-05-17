@@ -27,7 +27,7 @@ class _TextSearchPageState extends State<TextSearchPage> {
 
   void _onScroll() {
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      // 검색 기반 스크롤은 현재 미사용
+      // 무한 스크롤 기능 필요 시 추가
     }
   }
 
@@ -50,16 +50,26 @@ class _TextSearchPageState extends State<TextSearchPage> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.0.248:8080/text_search'),
+        Uri.parse('http://192.168.0.248:8080/data/txt2img'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'keyword': keyword}),
+        body: jsonEncode({
+          'ssid': 'test',
+          'keyword': keyword,
+        }),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data is List) {
+        if (data is Map && data['results'] is List) {
+          final results = data['results'] as List;
+          final filenames = results
+              .map((item) => item['filename'])
+              .whereType<String>()
+              .map((filename) => filename.replaceAll('.jpg', '').replaceAll('.jpeg', '').replaceAll('.png', ''))
+              .toList();
+
           setState(() {
-            _searchUuidList = List<String>.from(data);
+            _searchUuidList = filenames;
           });
         } else {
           setState(() {
@@ -97,7 +107,6 @@ class _TextSearchPageState extends State<TextSearchPage> {
 
     return Column(
       children: [
-        // 🔍 검색 UI
         Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -126,8 +135,6 @@ class _TextSearchPageState extends State<TextSearchPage> {
             ],
           ),
         ),
-
-        // 🔽 결과 렌더링 영역
         Expanded(
           child: isResultEmpty
               ? const Center(

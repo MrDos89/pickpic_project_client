@@ -37,8 +37,25 @@ class _GalleryImageGridState extends State<GalleryImageGrid> {
   @override
   void didUpdateWidget(covariant GalleryImageGrid oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    // ✅ 컬럼 수 변경 시 전체 리로드
     if (oldWidget.crossAxisCount != widget.crossAxisCount && widget.filterUuidList == null) {
       _resetAndReload();
+    }
+
+    // ✅ 필터 리스트가 변경되었을 때 다시 필터링
+    final oldSet = oldWidget.filterUuidList?.toSet() ?? {};
+    final newSet = widget.filterUuidList?.toSet() ?? {};
+    if (oldSet.length != newSet.length || !oldSet.containsAll(newSet)) {
+      if (widget.filterUuidList != null) {
+        final filteredAssets = ImageUploader.filterAssetsByUuidList(widget.filterUuidList!);
+        setState(() {
+          _images = filteredAssets;
+          _hasMore = false;
+        });
+      } else {
+        _resetAndReload();
+      }
     }
   }
 

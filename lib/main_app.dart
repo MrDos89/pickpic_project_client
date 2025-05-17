@@ -37,7 +37,7 @@ class _MainAppState extends State<MainApp> {
     await ImageUploader.prepareAllImages();
     await ImageUploader.compressAndBatchUploadImages(
       context: context,
-      uploadUrl: "http://192.168.0.247:8080/file",
+      uploadUrl: "http://192.168.0.248:8080/file",
       onSuccess: (msg) => debugPrint(msg),
       onError: (err) => debugPrint("업로드 실패: $err"),
     );

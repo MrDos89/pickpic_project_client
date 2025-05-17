@@ -1,12 +1,11 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
+import 'dart:math';
+import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:http/http.dart' as http;
-import 'package:uuid/uuid.dart';
-// import 'package:wifi_info_plus/wifi_info_plus.dart';
+import 'package:crypto/crypto.dart';
 import 'package:pickpic_project_client/page/loading_overlay.dart';
 
 class ImageUploader {
@@ -14,7 +13,7 @@ class ImageUploader {
 
   static Map<String, AssetEntity> get uuidAssetMap => _uuidToAssetMap;
 
-  static Future<void> prepareAllImages({int maxCount = 999 }) async {
+  static Future<void> prepareAllImages({int maxCount = 999}) async {
     final permission = await PhotoManager.requestPermissionExtend();
     if (!permission.isAuth) return;
 
@@ -28,8 +27,12 @@ class ImageUploader {
     _uuidToAssetMap.clear();
 
     for (final asset in assets) {
-      final uuid = const Uuid().v4();
-      _uuidToAssetMap[uuid] = asset;
+      _uuidToAssetMap[asset.id] = asset;
+    }
+
+    debugPrint('🧩 총 저장된 uuidAssetMap 키: ${_uuidToAssetMap.length}');
+    for (final key in _uuidToAssetMap.keys.take(20)) {
+      debugPrint(' - $key');
     }
   }
 
@@ -47,7 +50,7 @@ class ImageUploader {
       final List<Map<String, dynamic>> imagePayloads = [];
       int skipped = 0;
 
-      for (final entry in List<MapEntry<String, AssetEntity>>.from(_uuidToAssetMap.entries)) {
+      for (final entry in _uuidToAssetMap.entries) {
         final uuid = entry.key;
         final entity = entry.value;
 
@@ -126,34 +129,46 @@ class ImageUploader {
   }
 
   static List<AssetEntity> filterAssetsByUuidList(List<String> uuidList) {
-    return uuidList
+    for (final uuid in uuidList) {
+      if (_uuidToAssetMap.containsKey(uuid)) {
+        debugPrint('✅ 매칭됨: $uuid');
+      } else {
+        debugPrint('❌ 없음: $uuid');
+      }
+    }
+
+    final filtered = uuidList
         .map((uuid) => _uuidToAssetMap[uuid])
         .whereType<AssetEntity>()
         .toList();
+
+    debugPrint("🔍 서버에서 받은 UUID ${uuidList.length}개 → 최종 이미지 ${filtered.length}개");
+
+    return filtered;
   }
 
   static final Map<String, List<String>> _poseToUuidListMap = {};
 
   static Map<String, List<String>> get poseToUuidListMap => _poseToUuidListMap;
 
-  static const Map<String, String> _poseKorToEng = {
-    '만세 포즈': 'hands_up',
-    '점프샷 포즈': 'jump_shot',
-    '서있는 포즈': 'standing',
-    '앉은 포즈': 'sitting',
-    '누워있는 포즈': 'lying',
-    '브이 손동작 포즈': 'v_sign',
-    '하트 손동작 포즈': 'heart_sign',
-    '최고 손동작 포즈': 'thumbs_up',
+  static const Map<String, String> _poseKorToKeyword = {
+    '만세 포즈': '만세',
+    '점프샷 포즈': '점프',
+    '서있는 포즈': '서있음',
+    '앉은 포즈': '앉음',
+    '누워있는 포즈': '누워있음',
+    '브이 손동작 포즈': '브이',
+    '하트 손동작 포즈': '하트',
+    '최고 손동작 포즈': '최고',
   };
 
   static Future<void> fetchAllPoseUuidListsFromServer() async {
-    for (final poseKor in _poseKorToEng.keys) {
-      final poseEng = _poseKorToEng[poseKor];
+    for (final poseKor in _poseKorToKeyword.keys) {
+      final poseEng = _poseKorToKeyword[poseKor];
       if (poseEng == null) continue;
 
       try {
-        final response = await http.get(Uri.parse("http://192.168.0.247:8080/pose/$poseEng"));
+        final response = await http.get(Uri.parse("http://192.168.0.248:8080/pose/$poseEng"));
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           if (data is List) {
