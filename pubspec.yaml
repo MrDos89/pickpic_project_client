@@ -44,6 +44,7 @@ dependencies:
   uuid: ^4.2.2
   http: ^0.13.6
   crypto: ^3.0.3
+  font_awesome_flutter: ^10.4.0
 
 dev_dependencies:
   flutter_test:

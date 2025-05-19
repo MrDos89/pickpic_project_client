@@ -42,10 +42,10 @@ class _MainAppState extends State<MainApp> {
       onError: (err) => debugPrint("업로드 실패: $err"),
     );
 
-    LoadingOverlay.hide(context);
-
     // ✅ 포즈별 UUID 리스트 캐싱
-    await ImageUploader.fetchAllPoseUuidListsFromServer();
+    // await ImageUploader.fetchAllPoseUuidListsFromServer();
+
+    LoadingOverlay.hide(context);
   }
 
   @override

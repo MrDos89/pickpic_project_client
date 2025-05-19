@@ -151,39 +151,31 @@ class ImageUploader {
     '점프샷 포즈': '점프',
     '서있는 포즈': '서있음',
     '앉은 포즈': '앉음',
-    '누워있는 포즈': '누워있음',
     '브이 손동작 포즈': '브이',
     '하트 손동작 포즈': '하트',
     '최고 손동작 포즈': '최고',
   };
 
   static Future<void> fetchAllPoseUuidListsFromServer() async {
-    for (final poseKor in _poseKorToKeyword.keys) {
-      final keyword = _poseKorToKeyword[poseKor];
-      if (keyword == null) continue;
+    const poses = ['만세 포즈', '점프샷 포즈', '서있는 포즈', '앉은 포즈', '브이 손동작 포즈', '하트 손동작 포즈', '최고 손동작 포즈'];
+    poseToUuidListMap.clear();
 
-      try {
-        final response = await http.post(
-          Uri.parse("http://192.168.0.247:8080/data/txt2img/test"),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({"ssid": "test", "keyword": keyword}),
-        );
+    for (final pose in poses) {
+      final shortPose = pose.replaceAll(' 포즈', ''); // "만세 포즈" → "만세"
+      final response = await http.post(
+        Uri.parse("http://192.168.0.247:8080/data/pose/test"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"pose": shortPose}),
+      );
 
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          if (data is Map && data['results'] is List) {
-            final filenames = (data['results'] as List)
-                .map((item) => item['filename'])
-                .whereType<String>()
-                .map((name) => name.replaceAll('.jpg', ''))
-                .toList();
-            _poseToUuidListMap[poseKor] = filenames;
-          }
-        } else {
-          debugPrint("❌ [$poseKor] 응답 실패: ${response.statusCode} (${response.body})");
-        }
-      } catch (e) {
-        debugPrint("❌ [$poseKor] UUID 리스트 가져오기 실패: $e");
+      if (response.statusCode == 200) {
+        final List<dynamic> list = jsonDecode(response.body);
+        poseToUuidListMap[pose] = list
+            .whereType<String>()
+            .map((e) => e.replaceAll('.jpg', '')) // .jpg 제거
+            .toList();
+      } else {
+        debugPrint("❌ $pose fetch 실패: ${response.statusCode} ${response.body}");
       }
     }
   }

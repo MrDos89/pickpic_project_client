@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pickpic_project_client/components/gallery_image_grid.dart';
 import 'package:pickpic_project_client/components/image_uploader.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'dart:typed_data';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class PoseSearchPage extends StatefulWidget {
   const PoseSearchPage({Key? key}) : super(key: key);
@@ -13,13 +13,21 @@ class PoseSearchPage extends StatefulWidget {
 
 class _PoseSearchPageState extends State<PoseSearchPage> {
   final List<String> poses = [
-    '만세 포즈', '점프샷 포즈', '서있는 포즈', '앉은 포즈',
-    '누워있는 포즈', '브이 손동작 포즈', '하트 손동작 포즈', '최고 손동작 포즈',
+    '만세 포즈', '점프샷 포즈', '서있는 포즈', '앉은 포즈', '브이 손동작 포즈', '하트 손동작 포즈', '최고 손동작 포즈',
   ];
+
+  final Map<String, Widget> poseIcons = {
+    '만세 포즈': Icon(Icons.emoji_people, size: 48, color: Colors.deepPurple),
+    '점프샷 포즈': Icon(Icons.airline_stops, size: 48, color: Colors.deepPurple),
+    '서있는 포즈': Icon(Icons.accessibility, size: 48, color: Colors.deepPurple),
+    '앉은 포즈': Icon(Icons.event_seat, size: 48, color: Colors.deepPurple),
+    '브이 손동작 포즈': FaIcon(FontAwesomeIcons.handPeace, size: 48, color: Colors.deepPurple),
+    '하트 손동작 포즈': Icon(Icons.favorite, size: 48, color: Colors.deepPurple),
+    '최고 손동작 포즈': Icon(Icons.thumb_up, size: 48, color: Colors.deepPurple),
+  };
 
   String? _selectedPose;
   Map<String, List<String>> poseUuidMap = {};
-  Map<String, AssetEntity?> poseThumbnails = {};
 
   @override
   void initState() {
@@ -31,15 +39,9 @@ class _PoseSearchPageState extends State<PoseSearchPage> {
     for (final pose in poses) {
       final uuidList = ImageUploader.poseToUuidListMap[pose] ?? [];
       poseUuidMap[pose] = uuidList;
-
-      if (uuidList.isNotEmpty) {
-        final asset = ImageUploader.uuidAssetMap[uuidList.first];
-        poseThumbnails[pose] = asset;
-      } else {
-        poseThumbnails[pose] = null;
-      }
+      final matched = uuidList.where((u) => ImageUploader.uuidAssetMap.containsKey(u)).length;
+      debugPrint("📌 $pose: 총 ${uuidList.length}개 중 $matched개가 uuidAssetMap에 존재");
     }
-
     setState(() {});
   }
 
@@ -64,12 +66,8 @@ class _PoseSearchPageState extends State<PoseSearchPage> {
         itemBuilder: (context, index) {
           final pose = poses[index];
           final uuidList = ImageUploader.poseToUuidListMap[pose] ?? [];
-          final thumbnails = uuidList
-              .map((uuid) => ImageUploader.uuidAssetMap[uuid])
-              .whereType<AssetEntity>()
-              .take(4)
-              .toList();
           final count = uuidList.length;
+          final icon = poseIcons[pose] ?? Icons.folder;
 
           return GestureDetector(
             onTap: () => setState(() => _selectedPose = pose),
@@ -79,47 +77,13 @@ class _PoseSearchPageState extends State<PoseSearchPage> {
                 Container(
                   width: 100,
                   height: 100,
-                  padding: const EdgeInsets.all(2),
-                  child: thumbnails.isEmpty
-                      ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.image, size: 40, color: Colors.grey),
-                      SizedBox(height: 4),
-                      Text(
-                        'No Image',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
-                  )
-                      : GridView.builder(
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: EdgeInsets.zero,
-                    itemCount: 4,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 1,
-                      crossAxisSpacing: 1,
-                    ),
-                    itemBuilder: (context, i) {
-                      if (i < thumbnails.length) {
-                        return FutureBuilder<Uint8List?>(
-                          future: thumbnails[i].thumbnailDataWithSize(
-                              const ThumbnailSize(100, 100)),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.done &&
-                                snapshot.hasData &&
-                                snapshot.data != null) {
-                              return Image.memory(snapshot.data!, fit: BoxFit.cover);
-                            } else {
-                              return const SizedBox(); // 로딩 중에도 빈 공간
-                            }
-                          },
-                        );
-                      } else {
-                        return const SizedBox(); // 썸네일 없으면 빈 공간
-                      }
-                    },
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.grey[200],
+                  ),
+                  child: Center(
+                    child: poseIcons[pose] ?? Icon(Icons.folder),
                   ),
                 ),
                 const SizedBox(height: 8),
