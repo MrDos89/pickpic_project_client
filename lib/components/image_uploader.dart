@@ -164,7 +164,7 @@ class ImageUploader {
 
       try {
         final response = await http.post(
-          Uri.parse("http://192.168.0.248:8080/data/txt2img"),
+          Uri.parse("http://192.168.0.247:8080/data/txt2img/test"),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({"ssid": "test", "keyword": keyword}),
         );

@@ -1,5 +1,11 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:photo_manager/photo_manager.dart';
+import 'package:http/http.dart' as http;
 import 'package:pickpic_project_client/components/gallery_image_grid.dart';
+import 'package:pickpic_project_client/components/image_uploader.dart';
+import 'package:pickpic_project_client/page/loading_overlay.dart';
 
 class ImageSearchPage extends StatefulWidget {
   final int crossAxisCount;
@@ -11,63 +17,90 @@ class ImageSearchPage extends StatefulWidget {
 }
 
 class _ImageSearchPageState extends State<ImageSearchPage> {
-  final ScrollController _scrollController = ScrollController();
-  List<String> images = List.generate(20, (index) => '사진 $index');
-  bool isLoading = false;
+  List<String>? _filteredUuidList;
 
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-  }
+  Future<void> _onImageTap(String uuid) async {
+    final imageName = "$uuid.jpg";
+    LoadingOverlay.show(context, message: "이미지로 유사 이미지 검색 중...");
 
-  void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100 && !isLoading) {
-      _loadMore();
+    try {
+      final response = await http.post(
+        Uri.parse("http://192.168.0.247:8080/data/img2img/test"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"image_name": imageName}),
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        if (json is List) {
+          final filenames = json
+              .whereType<String>()
+              .map((f) => f.replaceAll('.jpg', ''))
+              .toList();
+
+          setState(() {
+            _filteredUuidList = filenames;
+          });
+        } else {
+          debugPrint("❌ 예상치 못한 응답 구조: $json");
+        }
+      } else {
+        debugPrint("❌ 서버 응답 오류: ${response.statusCode}, ${response.body}");
+      }
+    } catch (e) {
+      debugPrint("❌ 요청 실패: $e");
+    } finally {
+      LoadingOverlay.hide(context);
     }
-  }
-
-  void _loadMore() async {
-    setState(() => isLoading = true);
-    await Future.delayed(Duration(seconds: 1));
-    setState(() {
-      images.addAll(List.generate(20, (index) => '사진 ${images.length + index}'));
-      isLoading = false;
-    });
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final allAssets = ImageUploader.uuidAssetMap.entries.toList();
+
     return Column(
       children: [
-        const SizedBox(height: 30),
-        ElevatedButton.icon(
-          icon: Icon(Icons.upload_file),
-          label: Text("이미지 업로드"),
-          onPressed: () {
-            // 이미지 선택 로직
-          },
-        ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
+        const Text("이미지를 선택하면 유사한 이미지를 검색합니다."),
+        const SizedBox(height: 12),
         Expanded(
-          // child: GridView.builder(
-          //   controller: _scrollController,
-          //   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
-          //   itemCount: images.length + (isLoading ? 1 : 0),
-          //   itemBuilder: (context, index) {
-          //     if (index >= images.length) {
-          //       return Center(child: CircularProgressIndicator());
-          //     }
-          //     return Card(child: Center(child: Text(images[index])));
-          //   },
-          // ),
-          child: GalleryImageGrid(crossAxisCount: widget.crossAxisCount),
+          child: _filteredUuidList == null
+              ? GridView.builder(
+            padding: const EdgeInsets.all(8),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: widget.crossAxisCount,
+              crossAxisSpacing: 4,
+              mainAxisSpacing: 4,
+            ),
+            itemCount: allAssets.length,
+            itemBuilder: (context, index) {
+              final uuid = allAssets[index].key;
+              final asset = allAssets[index].value;
+
+              return FutureBuilder<Uint8List?>(
+                future: asset.thumbnailDataWithSize(
+                    const ThumbnailSize(200, 200)),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.done &&
+                      snapshot.hasData &&
+                      snapshot.data != null) {
+                    return GestureDetector(
+                      onTap: () => _onImageTap(uuid),
+                      child: Image.memory(snapshot.data!,
+                          fit: BoxFit.cover),
+                    );
+                  } else {
+                    return const Center(
+                        child: CircularProgressIndicator());
+                  }
+                },
+              );
+            },
+          )
+              : GalleryImageGrid(
+            filterUuidList: _filteredUuidList,
+            crossAxisCount: widget.crossAxisCount,
+          ),
         ),
       ],
     );
