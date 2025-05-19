@@ -41,6 +41,7 @@ class _PoseSearchPageState extends State<PoseSearchPage> {
   String? _selectedPose;
   List<String> _filteredUuidList = [];
   bool _isLoading = false;
+  final Map<String, List<String>> _poseCache = {};
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +104,14 @@ class _PoseSearchPageState extends State<PoseSearchPage> {
   }
 
   Future<void> _onPoseTap(String pose) async {
+    if (_poseCache.containsKey(pose)) {
+      setState(() {
+        _filteredUuidList = _poseCache[pose]!;
+        _selectedPose = pose;
+      });
+      return;
+    }
+
     final keyword = _poseKorToKeyword[pose] ?? pose.replaceAll(' 포즈', '');
     debugPrint("📡 [$pose] → pose 키워드 전송: $keyword");
 
@@ -122,16 +131,17 @@ class _PoseSearchPageState extends State<PoseSearchPage> {
             .map((e) => e.replaceAll('.jpg', ''))
             .toList();
 
-        final matched = uuidList.where((u) => ImageUploader.uuidAssetMap.containsKey(u)).length;
-        debugPrint("🎯 매칭된 이미지 수: $matched");
+        final matched = uuidList.where((u) => ImageUploader.uuidAssetMap.containsKey(u)).toList();
+        debugPrint("🎯 매칭된 이미지 수: ${matched.length}");
 
-        if (matched == 0) {
+        if (matched.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("📭 해당 포즈에 일치하는 이미지가 없습니다.")),
           );
         } else {
+          _poseCache[pose] = matched;
           setState(() {
-            _filteredUuidList = uuidList;
+            _filteredUuidList = matched;
             _selectedPose = pose;
           });
         }
